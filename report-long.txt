@@ -1,0 +1,40 @@
+# To display the perf.data header info, please use --header/--header-only options.
+#
+#
+# Total Lost Samples: 0
+#
+# Samples: 2M of event 'cpu-clock:pppH'
+# Event count (approx.): 22644272500830
+#
+# Overhead  Command      Shared Object           Symbol                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         
+# ........  ...........  ......................  .........................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................
+#
+    48.22%  llama-bench  libggml-cpu.so.0.9.11   [.] ggml_vec_dot_f16
+            |
+            ---ggml_vec_dot_f16
+               |          
+                --1.52%--0
+
+    42.20%  llama-bench  libggml-cpu.so.0.9.11   [.] ggml_vec_dot_q4_K_q8_K_generic
+            |
+            ---ggml_vec_dot_q4_K_q8_K_generic
+               |          
+                --8.81%--0
+
+     7.99%  llama-bench  libggml-cpu.so.0.9.11   [.] ggml_vec_dot_q6_K_q8_K_generic
+            |
+            ---ggml_vec_dot_q6_K_q8_K_generic
+               |          
+                --1.08%--0
+
+     0.42%  llama-bench  libggml-cpu.so.0.9.11   [.] ggml_compute_forward_mul_mat
+     0.27%  llama-bench  libggml-cpu.so.0.9.11   [.] ggml_cpu_fp32_to_fp16
+     0.22%  llama-bench  libggml-cpu.so.0.9.11   [.] ggml_vec_soft_max_f32
+     0.16%  llama-bench  libggml-cpu.so.0.9.11   [.] ggml_compute_forward_soft_max
+     0.12%  llama-bench  libgomp.so.1.0.0        [.] 0x00000000000207ba
+     0.06%  llama-bench  libggml-base.so.0.9.11  [.] quantize_row_q8_K_ref
+     0.03%  llama-bench  [kernel.kallsyms]       [k] handle_softirqs
+     0.03%  llama-bench  libgomp.so.1.0.0        [.] 0x00000000000207be
+     0.03%  llama-bench  libggml-cpu.so.0.9.11   [.] rotate_pairs<float>
+     0.03%  llama-bench  libc.so.6               [.] __memmove_sse2_unaligned_erms
+     0.03%  llama-bench  libgomp.so.1.0.0        [.] 0x00000000000207c6

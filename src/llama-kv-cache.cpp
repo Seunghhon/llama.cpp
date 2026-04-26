@@ -389,6 +389,91 @@ bool llama_kv_cache::seq_rm(llama_seq_id seq_id, llama_pos p0, llama_pos p1) {
 
     return true;
 }
+// ===== Edited ======
+void llama_kv_cache::compact_seq(llama_seq_id seq_id, llama_pos sink_end, llama_pos window_start) {
+    // sink_end    : attention sink 끝 position (exclusive) — 이 앞은 건드리지 않음
+    // window_start: recent window 시작 position — 이 뒤는 건드리지 않음
+    // 이 함수는 seq_rm 직후에 호출되어, 빈 hole을 앞으로 당겨 used_max_p1을 낮춤
+
+    const uint32_t s     = seq_to_stream[seq_id];
+    auto &         cells = v_cells[s];
+
+    const uint32_t kv_size = cells.size();
+
+    // 살아있는 cell 중 sink 이후, window 이전 구간은 이미 evict됨
+    // 남은 cell: [0, sink_end) 의 sink + [window_start, p_max] 의 window
+    // 이 둘을 앞쪽부터 빈 slot에 당겨 채운다
+
+    uint32_t dst = 0; // 다음에 쓸 빈 slot index
+
+    // sink 구간은 이미 앞에 있으므로 skip (dst를 sink 끝 위치로 맞춤)
+    // sink cell들은 이미 0~(sink_count-1)에 있고 이동 불필요
+    while (dst < kv_size && !cells.is_empty(dst)) {
+        ++dst;
+    }
+    // dst는 이제 첫 번째 빈 slot
+
+    if (dst >= kv_size) {
+        return; // 빈 slot 없음, compact 불필요
+    }
+
+    // window 구간의 cell들을 찾아 dst로 당김
+    for (uint32_t src = dst + 1; src < kv_size; ++src) {
+        if (cells.is_empty(src)) {
+            continue;
+        }
+
+        // 이미 제자리면 skip
+        if (src == dst) {
+            ++dst;
+            continue;
+        }
+
+        // --- 메타데이터 이동 ---
+        // dst는 비어있어야 함
+        const llama_pos     p   = cells.pos_get(src);
+        const llama_seq_id  sid = cells.seq_get(src); // single-seq 가정
+
+        cells.pos_set(dst, p);
+        cells.seq_add(dst, sid);
+        cells.rm(src);  // src를 비움
+
+        // --- K 버퍼 이동 ---
+        // K layout: [n_embd_k_gqa, kv_size, n_stream]
+        // cell i의 K: layer별로 k->data + i * row_size(n_embd_k_gqa)
+        for (auto & layer : layers) {
+            ggml_tensor * k = layer.k;
+            ggml_tensor * v = layer.v;
+
+            const uint64_t n_embd_k_gqa = k->ne[0];
+            const uint64_t n_embd_v_gqa = v->ne[0]; // v_trans=true 일 때는 kv_size가 ne[0]
+
+            const size_t k_row = ggml_row_size(k->type, n_embd_k_gqa);
+
+            char * k_data = (char *) k->data;
+            char * v_data = (char *) v->data;
+
+            // K: src → dst (연속 블록)
+            std::memcpy(
+                k_data + (size_t)dst * k_row,
+                k_data + (size_t)src * k_row,
+                k_row
+            );
+            // V layout: [n_embd_v_gqa, kv_size, n_stream] — v_trans와 무관하게 동일
+            // cell i의 V = v_data + i * row_size(n_embd_v_gqa)
+            if (v != nullptr) {
+                const size_t v_row = ggml_row_size(v->type, v->ne[0]);
+                std::memcpy(
+                    v_data + (size_t)dst * v_row,
+                    v_data + (size_t)src * v_row,
+                    v_row
+                );
+            }
+        }
+        ++dst;
+    }
+}
+// ================
 
 void llama_kv_cache::seq_cp(llama_seq_id seq_id_src, llama_seq_id seq_id_dst, llama_pos p0, llama_pos p1) {
     GGML_ASSERT(seq_id_src >= 0 && (size_t) seq_id_src < seq_to_stream.size());

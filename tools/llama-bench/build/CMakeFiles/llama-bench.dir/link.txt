@@ -1,0 +1,1 @@
+/usr/bin/c++ -rdynamic CMakeFiles/llama-bench.dir/llama-bench.o -o llama-bench  -lcommon -lllama 

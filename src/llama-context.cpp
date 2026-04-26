@@ -1,6 +1,11 @@
 #include "llama-context.h"
 
 #include "llama-arch.h"
+
+// ===== Edited ======
+#include "llama-kv-cache.h"
+// ==================
+
 #include "llama-impl.h"
 #include "llama-batch.h"
 #include "llama-io.h"
@@ -176,6 +181,22 @@ llama_context::llama_context(
     }
 
     // ref: https://github.com/ggml-org/llama.cpp/pull/17046#discussion_r2503085732
+    //====== Edited ======
+    {
+        const char * LLAMA_KV_EVICT_WINDOW = getenv("LLAMA_KV_EVICT_WINDOW");
+        kv_evict_window = LLAMA_KV_EVICT_WINDOW ? (uint32_t) atoi(LLAMA_KV_EVICT_WINDOW) : 0u;
+
+        const char * LLAMA_KV_ATTN_SINK = getenv("LLAMA_KV_ATTN_SINK");
+        kv_attn_sink = LLAMA_KV_ATTN_SINK ? (uint32_t) atoi(LLAMA_KV_ATTN_SINK) : 4u;
+
+        if (kv_evict_window > 0) {
+            LLAMA_LOG_INFO("%s: KV eviction enabled, window = %u tokens, attn_sink = %u tokens\n",
+                           __func__, kv_evict_window, kv_attn_sink);
+        }
+    }
+
+    //==================
+    
     cparams.n_ctx = GGML_PAD(cparams.n_ctx, 256);
 
     if (cparams.kv_unified) {
@@ -1611,6 +1632,27 @@ int llama_context::decode(const llama_batch & batch_inp) {
 
     // handle any pending shifts/copies
     memory_update(false);
+
+    // ====== Edited ======
+    if (kv_evict_window > 0 && memory) {
+        auto * kv = dynamic_cast<llama_kv_cache *>(memory.get());
+        const uint32_t n_seq = cparams.kv_unified ? (uint32_t) LLAMA_MAX_SEQ : cparams.n_seq_max;
+        for (uint32_t s = 0; s < n_seq; ++s) {
+            const llama_pos p_max = memory->seq_pos_max((llama_seq_id) s);
+            if (p_max < (llama_pos) kv_evict_window) continue;
+            const llama_pos p_cutoff = p_max - (llama_pos) kv_evict_window + 1;
+            // preserve attention sink: [0, kv_attn_sink)
+            // preserve recent window: [p_cutoff, p_max]
+            // remove middle: [kv_attn_sink, p_cutoff)
+            if ((llama_pos) kv_attn_sink < p_cutoff) {
+                memory->seq_rm((llama_seq_id) s, (llama_pos) kv_attn_sink, p_cutoff);
+                if (kv) {
+                    kv->compact_seq((llama_seq_id) s, (llama_pos) kv_attn_sink, p_cutoff);
+                }
+            }
+        }
+    }
+    // ===============
 
     llama_memory_context_ptr mctx;
 

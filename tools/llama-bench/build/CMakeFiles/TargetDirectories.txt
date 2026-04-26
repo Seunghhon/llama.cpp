@@ -1,0 +1,3 @@
+/home/jang/project/llama.cpp/tools/llama-bench/build/CMakeFiles/llama-bench.dir
+/home/jang/project/llama.cpp/tools/llama-bench/build/CMakeFiles/edit_cache.dir
+/home/jang/project/llama.cpp/tools/llama-bench/build/CMakeFiles/rebuild_cache.dir

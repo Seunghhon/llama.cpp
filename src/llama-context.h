@@ -343,6 +343,18 @@ private:
     // env: LLAMA_GRAPH_REUSE_DISABLE
     bool graph_reuse_disable = false;
 
+    // ======= Edited =======
+    // env: LLAMA_KV_EVICT_WINDOW
+    // if > 0, maintain sliding window of N recent tokens by evicting older ones
+    // before each decode. Goal: reduce DRAM bandwidth pressure on KV cache read.
+    uint32_t kv_evict_window = 0;
+
+    // env: LLAMA_KV_ATTN_SINK
+    // number of initial tokens (attention sink) to always retain.
+    // only effective when kv_evict_window > 0.
+    uint32_t kv_attn_sink = 4;
+    // =======================
+
     // perf
     mutable int64_t t_start_us  = 0;
     mutable int64_t t_load_us   = 0;
